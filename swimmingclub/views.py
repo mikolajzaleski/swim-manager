@@ -7,9 +7,10 @@ from django.shortcuts import render
 from django.contrib.auth import authenticate,login,logout
 from django.template import RequestContext
 from django.views.decorators.csrf import csrf_exempt
-# def add_user(request):
-    
-#     return HttpResponse(f"added user{user.email}")
+def add_user(request):
+        return HttpResponse("Nothing")
+    # return HttpResponse(f"added user{user.email}")
+
 @csrf_exempt
 def login_s(request):
         json_dat=json.loads(request.body)
@@ -21,11 +22,14 @@ def login_s(request):
             return HttpResponse("success "+user.get_username())
         else:
             return HttpResponse("bad_cred")
+
 def show_user(request):
     return HttpResponse(request.user.email+"good")
+
 def index(request):
     template=loader.get_template('home.html')
     return HttpResponse(template.render())
+
 def create_account(request):
     template =loader.get_template('create_account.html')
     return HttpResponse(template.render())
