@@ -16,7 +16,8 @@ conn=psycopg2.connect(
 bar=navb.Navbar('Swim Manager',navb.View('Dodaj Trenera','add_trener'),
 navb.View('Dodaj Zawodnika','add_zawodnik'),
 navb.View('Adresy','adresy'),
-navb.View('Wyniki','wyniki')
+navb.View('Wyniki','wyniki'),
+navb.View('Dodaj Zawody','add_zawody')
 )
 nav=Nav()
 nav.register_element('top',bar)
@@ -50,7 +51,9 @@ class AddTrener(FlaskForm):
     post_code=StringField('Kod Pocztowy')
     submit=SubmitField('Dodaj Zawodnika')
     
-    
+class AddZawody(FlaskForm):
+    name=StringField("")
+    choose_location=('Lokalizacja',)
 @app.route('/wyniki')
 def wyniki():
     cur=conn.cursor()
@@ -114,5 +117,12 @@ def add_trener():
         conn.commit()
         cur.close()
     return render_template('add_zawodnik_form.html',form=form)
+@app.route('/add_zawody')
+def add_zawody():
+    form=AddZawody()
+    zawody=(form.name).data
+    cur=conn.cursor()
+    return render_template('add_zawodnik_form.html',form=form)
+    
 nav.init_app(app)
 app.run()
