@@ -284,7 +284,7 @@ def add_wynik():
     form=DodajWynik()
     
     ready=False
-    if form.validate() and form.submit.data:
+    if form.validate_on_submit() :
 
         
         cursor=conn.cursor()
