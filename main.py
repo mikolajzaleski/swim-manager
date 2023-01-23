@@ -1,9 +1,11 @@
-from flask import Flask,render_template,request
+from flask import Flask,render_template,request,session,redirect
 import json
-from wtforms import SubmitField, SelectField, RadioField, HiddenField, StringField, IntegerField, FloatField,validators
+from wtforms import SubmitField, SelectField, RadioField, HiddenField, StringField, IntegerField, FloatField,validators,SelectMultipleField,widgets,BooleanField
+from wtforms.ext.sqlalchemy.fields import QuerySelectField
+
 from flask_bootstrap import Bootstrap
 from flask_wtf import FlaskForm
-from wtforms.fields.html5 import DateField,DateTimeField 
+from wtforms.fields.html5 import DateField,DateTimeField
 
 import flask_nav.elements as navb
 from flask_nav import Nav
@@ -20,7 +22,9 @@ navb.View('Dodaj Zawodnika','add_zawodnik'),
 navb.View('Adresy','adresy'),
 navb.View('Wyniki','wyniki'),
 navb.View('Dodaj Zawody','add_zawody'),
-navb.View('Zobacz wyniki zawodnika','show_wyniki_zawodnika')
+navb.View('Zobacz wyniki zawodnika','show_wyniki_zawodnika'),
+navb.View('Zobacz wyniki wg zawodow',"show_wyniki_zawodow"),
+navb.View("Dodaj Wynik","add_wynik")
 )
 nav=Nav()
 nav.register_element('top',bar)
@@ -31,6 +35,9 @@ app.config.update(dict(
     SECRET_KEY="powerful secretkey",
     WTF_CSRF_SECRET_KEY="a csrf secret key"
 ))
+class MultiCheckboxField(SelectMultipleField):
+    widget = widgets.ListWidget(html_tag='ul', prefix_label=False)
+    option_widget = widgets.CheckboxInput()
 
 
 class AddZawodnik(FlaskForm):
@@ -51,7 +58,34 @@ class ChooseSwimmer(FlaskForm):
     cursor.close()
     player=SelectField("Zawodnik",choices=swimmers)
     submit=SubmitField("Wybierz zawodnika")
-
+class ChooseZawody(FlaskForm):
+    cursor=conn.cursor()
+    cursor.execute("Select id_zawodow,nazwa  from zawody ")
+    zaw=cursor.fetchall()
+    cursor.close()
+    player=SelectField("Zawody",choices=zaw)
+    submit=SubmitField("Wybierz zawody")
+    
+class DodajWynik(FlaskForm):
+    cursor=conn.cursor()
+    cursor.execute("Select id_zawodow,nazwa from zawody")
+    choice=cursor.fetchall()
+    
+    cursor.execute("Select id_konkurencji,nazwa_konkurencji from konkurencje" )
+    cursor.close()
+    zawody=SelectField("Zawody",choices=choice)
+    submit=SubmitField("Zatwierdź")
+class Wynik2(FlaskForm):
+    id=0
+    cursor=conn.cursor()
+    cursor.execute("Select id_konkurencji,nazwa_konkurencji from konkurencje where id_konkurencji in(Select id_konkurencji from zawody_konkurencje where id_zawodow=%s)",[id])
+    choic=cursor.fetchall()
+    cursor.execute("Select z.id_zawodnika, z.imie||' '||z.nazwisko from zawodnicy z")
+    zawodnicy=cursor.fetchall()
+    konkurencja=SelectField("Konkurencja",choices=choic)
+    zawodnik=SelectField("Zawodnik",choices=zawodnicy)
+    czas=FloatField("Czas")
+    submit1=SubmitField("Zatwierdź")
 class AddTrener(FlaskForm):
     name=StringField('Imię')
     surname=StringField('Nazwisko')
@@ -62,29 +96,48 @@ class AddTrener(FlaskForm):
     pesel=IntegerField('Pesel')
     post_code=StringField('Kod Pocztowy')
     submit=SubmitField('Dodaj Zawodnika')
-    
-    
+
+class ChooseGroup(FlaskForm):
+    cursor=conn.cursor()
+    cursor.execute("SELECT id_grupy,nazwa FROM GRUPY")
+    gr=cursor.fetchall()
+    cursor.close()
+    grupa=SelectField(choices=gr)
 class AddZawody(FlaskForm):
     name=StringField('Nazwa Wydarzenia')
     
     type_of_event=RadioField(label='Typ wydarzenia',choices=[('tr','Trening'),('zaw','Zawody')])
+    cur=conn.cursor()
+    cur.execute('Select id_konkurencji,nazwa_konkurencji from konkurencje')
+    wyb=cur.fetchall()
+    checkboxes={}
    
+    mul=SelectMultipleField(choices=wyb,coerce=int,validate_choice=False)
+    
+    
         
     date=DateField()
-    cur=conn.cursor()
+    
     cur.execute("Select id_obiektu,nazwa from obiekty")
     locations=cur.fetchall()
     cur.close()
     print(locations)
     choose_location=SelectField('Lokalizacja',choices=locations)
+    
     submit=SubmitField()
+@app.route('/konkurencje',methods=['GET'])
+def konkurencje():
+    id=request.args.get("id_zawodow")
+    cur=conn.cursor()
+    cur.execute("Select kz.id_konkurencji from zawody_konkurencje kz  inner join konkurencje k on kz.id_konkurencji=k.id_konkurencji where id_zawodow=%s",[id])
+    return json.JSONEncoder().encode({"list":cur.fetchall()})
 @app.route('/wyniki')
 def wyniki():
     cur=conn.cursor()
     cur.execute("SELECT * FROM NAZWISKA_Wyniki")
     z=cur.fetchall()
     cur.close()
-    return render_template("adresy.html",value=z)
+    return render_template("wyniki1.html",value=z)
     
 @app.route('/zawody')
 def zawody():
@@ -179,12 +232,17 @@ def add_zawody():
         type_of_event=(form.type_of_event).data
         location=(form.choose_location).data
         date=(form.date).data
+        choices=(form.mul).data
         result=[]
         cur=conn.cursor()
         if (type_of_event!='tr'):
-            cur.execute('insert into zawody(nazwa,data_zawodow,id_obiektu) values(%s,%s) ',[zawody,date,location])
+            cur.execute('insert into zawody(nazwa,data_zawodow,id_obiektu) values(%s,%s,%s) ',[zawody,date,location])
+            for data in choices:
+                cur.execute('insert into zawody_konkurencje(id_zawodow,id_konkurencji) values((select id_zawodow from zawody where data_zawodow=%s and id_obiektu=%s),%s)',[date,location,data])
         else:
-             cur.execute('insert into treningi(data_treningu,id_obiektu) values(%s,%s) ',[date,location])
+            cur.execute('insert into treningi(data_treningu,id_obiektu) values(%s,%s) ',[date,location])
+            for data in choices:
+                cur.execute('insert into treningi_konkurencje(id_zawodow,id_konkurencji) values((select id_treningu from treningi where data_treningu=%s and id_obiektu=%s),%s)',[date,location,data])
             
         conn.commit()
         cur.close()
@@ -202,12 +260,59 @@ def show_wyniki_zawodnika():
     if form.validate_on_submit():
         zawodnik=(form.player).data
         cur =conn.cursor()
-        cur.execute('select * from nazwiska_wyniki where id_zawodnika=%s',[zawodnik])
+        cur.execute('select * from nazwiska_wyniki where id_zawodnika=%s;',[zawodnik])
         val=cur.fetchall()
         cur.close()
         
     return render_template('wyniki.html',form=form,value=val)
 
+@app.route('/show_wyniki_zawodow',methods=['GET','POST'])
+def show_wyniki_zawodow():
+    form=ChooseZawody()
+    val=["",""]
+    if form.validate_on_submit():
+        zawody=(form.player).data
+        cur=conn.cursor()
+        cur.execute(  " select * from wyniki_zawody where id_zawodow =%s;",[zawody])
+        val=cur.fetchall()
+        cur.close()
+    return render_template('wyniki.html',form=form,value=val)
+@app.route('/add_wynik',methods=["POST","GET"])
+
+def add_wynik():
     
+    form=DodajWynik()
+    
+    ready=False
+    if form.validate() and form.submit.data:
+
+        
+        cursor=conn.cursor()
+        cursor.execute("Select id_konkurencji,nazwa_konkurencji from konkurencje where id_konkurencji in(Select id_konkurencji from zawody_konkurencje where id_zawodow=%s)",[(form.zawody).data])
+        choic=cursor.fetchall()
+        cursor.close()
+        session['choic']=choic
+        session['id']=(form.zawody).data
+        return redirect('/add_wynik2')
+        
+
+    return render_template("add_zawodnik_form1.html",form=form)
+@app.route('/add_wynik2',methods=["POST","GET"])
+def add_wynik2():
+    form1=Wynik2()
+    form1.konkurencja.choices=session['choic']
+    
+    if form1.validate and form1.submit1.data:
+                cursor=conn.cursor()
+                id=session['id']
+                cursor.execute("Insert into wyniki(id_konkurencji,id_zawodow,id_zawodnika,czas) values(%s,%s,%s,%s)",[(form1.konkurencja).data,id,(form1.zawodnik).data,(form1.czas).data])
+                conn.commit()
+                cursor.close()
+    return render_template("add_zawodnik_form1.html",form=form1)
+@app.route('/show_grupy',methods=["POST","GET"])
+def show_grupy():
+    form =ChooseGroup()
+    if form.validate_on_submit:
+        None
 nav.init_app(app)
 app.run()
