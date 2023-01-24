@@ -1,0 +1,32 @@
+{% extends 'home.html'%}
+{% import "bootstrap/wtf.html" as wtf %}
+{% block content %}
+<div class="container">
+    <table class="table">
+        <thead>
+            <tr>
+                <th scope="col">Imie</th>
+                <th scope="col">Nazwisko</th>
+                <th scope="col">Płeć</th>
+                <th scope="col">Klub</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in value%}
+            <tr>
+                <td>{{row[0]}}</td>
+                <td>{{row[1]}}</td>
+                <td>{{row[2]}}</td>
+                <td>{{row[3]}}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <br>
+    <h1>Dodaj zawodnika</h1>
+    <br>
+{{wtf.quick_form(form)}}
+{{response}}
+</div>
+
+{% endblock %}

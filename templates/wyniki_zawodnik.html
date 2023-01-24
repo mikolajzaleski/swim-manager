@@ -1,0 +1,28 @@
+{% extends 'home.html'%}{% import "bootstrap/wtf.html" as wtf %}
+{% block content %}
+
+<div class="container">
+    {{wtf.quick_form(form)}}
+    {{ form.csrf_token }}
+<table class="table">
+    <thead>
+        <tr>
+            <th scope="col">Wynik</th>
+            <th scope="col">Konkurencja</th>
+            <th scope="col">Data uzyskania wyniku</th>
+            <th scope="col">Zawody</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for row in value%}
+        <tr>
+            <td>{{row[2]}}</td>
+            <td>{{row[3]}}</td>
+            <td>{{row[5]}}</td>
+            <td>{{row[6]}}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+</div>
+{% endblock %}

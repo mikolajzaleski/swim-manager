@@ -1,0 +1,30 @@
+{% extends 'home.html'%}
+{% import "bootstrap/wtf.html" as wtf %}
+{% block content %}
+<div class="container">
+    <table class="table">
+        <thead>
+            <tr>
+                <th scope="col">Data</th>
+                <th scope="col">Zawody</th>
+                <th scope="col">Obiekt</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in value%}
+            <tr>
+                <td>{{row[0]}}</td>
+                <td>{{row[1]}}</td>
+                <td>{{row[2]}}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <br>
+    <h1>Utwórz zawody</h1>
+    <br>
+{{wtf.quick_form(form)}}
+{{response}}
+</div>
+
+{% endblock %}

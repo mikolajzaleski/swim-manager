@@ -1,17 +1,15 @@
-{% extends 'home.html'%}{% import "bootstrap/wtf.html" as wtf %}
+{% extends 'home.html'%}
 {% block content %}
-
 <div class="container">
-    {{wtf.quick_form(form)}}
-    {{ form.csrf_token }}
+
 <table class="table">
     <thead>
         <tr>
             <th scope="col">Imie</th>
             <th scope="col">Nazwisko</th>
-            <th scope="col">Wynik</th>
+            <th scope="col">Czas</th>
             <th scope="col">Konkurencja</th>
-            <th scope="col">Konkurencja</th>
+            <th scope="col">Zawody</th>
         </tr>
     </thead>
     <tbody>
@@ -19,9 +17,9 @@
         <tr>
             <td>{{row[0]}}</td>
             <td>{{row[1]}}</td>
-            <td>{{row[2]}}</td>
+            <td>{{row[2]}} </td>
             <td>{{row[3]}}</td>
-            <td>{{row[5]}}</td>
+            <td>{{row[6]}}</td>
         </tr>
         {% endfor %}
     </tbody>

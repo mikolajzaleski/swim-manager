@@ -1,11 +1,11 @@
 from flask import Flask,render_template,request,session,redirect
 import json
 from wtforms import SubmitField, SelectField, RadioField, HiddenField, StringField, IntegerField, FloatField,validators,SelectMultipleField,widgets,BooleanField
-from wtforms.ext.sqlalchemy.fields import QuerySelectField
+#from wtforms.ext.sqlalchemy.fields import QuerySelectField
 
 from flask_bootstrap import Bootstrap
 from flask_wtf import FlaskForm
-from wtforms.fields.html5 import DateField,DateTimeField
+from wtforms.fields import DateField,DateTimeField
 
 import flask_nav.elements as navb
 from flask_nav import Nav
@@ -14,23 +14,28 @@ import psycopg2
 conn=psycopg2.connect(
     host="localhost",
     database="swimmanager",
-    user="postgres",
-    password="postgres"
+    user="swim",
+    password="swim123"
 )
-bar=navb.Navbar('Swim Manager',navb.View('Dodaj Trenera','add_trener'),
-navb.View('Dodaj Zawodnika','add_zawodnik'),
-navb.View('Adresy','adresy'),
+
+bar=navb.Navbar(
+navb.View('Swim Manager','home'),
+navb.View('Trenerzy','trenerzy'),
+navb.View('Zawodnicy','zawodnicy'),
+navb.View('Kluby','kluby'),
+navb.View('Obiekty sportowe','adresy'),
 navb.View('Wyniki','wyniki'),
-navb.View('Dodaj Zawody','add_zawody'),
-navb.View('Zobacz wyniki zawodnika','show_wyniki_zawodnika'),
-navb.View('Zobacz wyniki wg zawodow',"show_wyniki_zawodow"),
+navb.View('Kalendarz zawodów','add_zawody'),
+navb.View('Zobacz wyniki zawodnika','wyniki_zawodnika'),
+navb.View('Zobacz wyniki wg zawodow',"wyniki_zawodow"),
 navb.View("Dodaj Wynik","add_wynik")
 )
+
 nav=Nav()
 nav.register_element('top',bar)
 app =Flask(__name__)
 bootstrap=Bootstrap(app)
-import os
+
 app.config.update(dict(
     SECRET_KEY="powerful secretkey",
     WTF_CSRF_SECRET_KEY="a csrf secret key"
@@ -50,7 +55,9 @@ class AddZawodnik(FlaskForm):
     apt_num=IntegerField('Numer lokalu',validators=[validators.optional()])
     pesel=IntegerField('Pesel')
     post_code=StringField('Kod Pocztowy')
-    submit=SubmitField('Dodaj Zawodnika')
+    club=StringField('Klub sportowy')
+    submit=SubmitField('Dodaj')
+
 class ChooseSwimmer(FlaskForm):
     cursor=conn.cursor()
     cursor.execute("Select id_zawodnika,imie ||' '||nazwisko from zawodnicy ")
@@ -58,23 +65,30 @@ class ChooseSwimmer(FlaskForm):
     cursor.close()
     player=SelectField("Zawodnik",choices=swimmers)
     submit=SubmitField("Wybierz zawodnika")
+
 class ChooseZawody(FlaskForm):
     cursor=conn.cursor()
-    cursor.execute("Select id_zawodow,nazwa  from zawody ")
+    cursor.execute("Select id_zawodow, nazwa  from zawody ")
     zaw=cursor.fetchall()
+    cursor.execute("Select id_konkurencji, nazwa_konkurencji from konkurencje ")
+    kon=cursor.fetchall()
     cursor.close()
-    player=SelectField("Zawody",choices=zaw)
+    print(kon)
+    zawody=SelectField("Zawody",choices=zaw)
+    konkurencja=SelectField("Konkurencja",choices=kon)
+    plec=SelectField("Płeć",choices=['M','K'])
     submit=SubmitField("Wybierz zawody")
     
 class DodajWynik(FlaskForm):
     cursor=conn.cursor()
-    cursor.execute("Select id_zawodow,nazwa from zawody")
+    cursor.execute("Select id_zawodow, nazwa from zawody")
     choice=cursor.fetchall()
     
     cursor.execute("Select id_konkurencji,nazwa_konkurencji from konkurencje" )
     cursor.close()
     zawody=SelectField("Zawody",choices=choice)
     submit=SubmitField("Zatwierdź")
+
 class Wynik2(FlaskForm):
     id=0
     cursor=conn.cursor()
@@ -86,6 +100,7 @@ class Wynik2(FlaskForm):
     zawodnik=SelectField("Zawodnik",choices=zawodnicy)
     czas=FloatField("Czas")
     submit1=SubmitField("Zatwierdź")
+
 class AddTrener(FlaskForm):
     name=StringField('Imię')
     surname=StringField('Nazwisko')
@@ -95,7 +110,12 @@ class AddTrener(FlaskForm):
     apt_num=IntegerField('Numer lokalu',validators=[validators.optional()])
     pesel=IntegerField('Pesel')
     post_code=StringField('Kod Pocztowy')
-    submit=SubmitField('Dodaj Zawodnika')
+    club=StringField('Klub')
+    submit=SubmitField('Dodaj')
+
+class AddKlub(FlaskForm):
+    name=StringField('Nazwa')
+    submit=SubmitField('Dodaj')
 
 class ChooseGroup(FlaskForm):
     cursor=conn.cursor()
@@ -103,10 +123,10 @@ class ChooseGroup(FlaskForm):
     gr=cursor.fetchall()
     cursor.close()
     grupa=SelectField(choices=gr)
+
 class AddZawody(FlaskForm):
     name=StringField('Nazwa Wydarzenia')
-    
-    type_of_event=RadioField(label='Typ wydarzenia',choices=[('tr','Trening'),('zaw','Zawody')])
+
     cur=conn.cursor()
     cur.execute('Select id_konkurencji,nazwa_konkurencji from konkurencje')
     wyb=cur.fetchall()
@@ -114,8 +134,6 @@ class AddZawody(FlaskForm):
    
     mul=SelectMultipleField(choices=wyb,coerce=int,validate_choice=False)
     
-    
-        
     date=DateField()
     
     cur.execute("Select id_obiektu,nazwa from obiekty")
@@ -125,25 +143,52 @@ class AddZawody(FlaskForm):
     choose_location=SelectField('Lokalizacja',choices=locations)
     
     submit=SubmitField()
+
 @app.route('/konkurencje',methods=['GET'])
 def konkurencje():
     id=request.args.get("id_zawodow")
     cur=conn.cursor()
     cur.execute("Select kz.id_konkurencji from zawody_konkurencje kz  inner join konkurencje k on kz.id_konkurencji=k.id_konkurencji where id_zawodow=%s",[id])
     return json.JSONEncoder().encode({"list":cur.fetchall()})
+
 @app.route('/wyniki')
 def wyniki():
     cur=conn.cursor()
     cur.execute("SELECT * FROM NAZWISKA_Wyniki")
     z=cur.fetchall()
     cur.close()
-    return render_template("wyniki1.html",value=z)
+    return render_template("wyniki_all.html",value=z)
     
 @app.route('/zawody')
 def zawody():
     cur=conn.cursor()
     cur.execute("SELECT * FROM NAZWISKA_ZAWODY")
     z=cur.fetchall()
+
+@app.route('/kluby', methods=['GET','POST'])
+def kluby():
+    cur=conn.cursor()
+    cur.execute("SELECT nazwa_klubu FROM public.kluby order by nazwa_klubu asc")
+    z=cur.fetchall()
+    cur.close()
+    form=AddKlub()
+    if form.validate_on_submit():
+        name=(form.name).data
+        cur=conn.cursor()
+        
+        cur.execute('select * from kluby where nazwa_klubu=%s',[name])
+        if ((cur.rowcount>0)):
+            response="Klub o podanej nazwie już istnieje"
+        else:
+            cur.execute('call dodaj_klub(%s::varchar)',[name])
+
+            conn.commit()
+            if (cur.rowcount>0):
+                response=f"Dodano klub {name}"
+            else:
+                response="Niepowodzenie"
+        cur.close()
+    return render_template("kluby.html",form=form, value=z)
 
 @app.route('/')
 def home():
@@ -152,13 +197,18 @@ def home():
 @app.route('/adresy')
 def adresy():
     cur=conn.cursor()
-    cur.execute("SELECT * FROM public.obiekty",)
+    cur.execute("SELECT nazwa, dane_adresowe FROM public.obiekty",)
     z=cur.fetchall()
     cur.close()
     return render_template("adresy.html",value=z)
 
-@app.route('/add_zawodnik',methods=['GET','POST'])
-def add_zawodnik():
+@app.route('/zawodnicy',methods=['GET','POST'])
+def zawodnicy():
+    cur=conn.cursor()
+    cur.execute("Select zw.imie, zw.nazwisko, zw.plec, kl.nazwa_klubu from public.zawodnicy zw inner join public.kluby kl on zw.id_klubu=kl.id_klubu order by zw.nazwisko asc, zw.imie asc")
+    z=cur.fetchall()
+    cur.close()
+
     response=""
     form=AddZawodnik()
     if form.validate_on_submit():
@@ -171,25 +221,35 @@ def add_zawodnik():
         apt_num=(form.apt_num).data
         pesel=(form.pesel).data
         post_code=(form.post_code).data
+        club=(form.club).data
         cur=conn.cursor()
         
         cur.execute('select * from zawodnicy where pesel=%s::numeric',[pesel])
         if ((cur.rowcount>0)):
             response="Zawodnik o podanym peselu już istnieje"
         else:
-            cur.execute('call dodaj_zawodnika(%s::varchar,%s::varchar,%s::numeric,%s::varchar,%s::varchar,%s::varchar,%s,%s,%s,%s::char(1))',[name,surname,pesel,street,post_code,town,house_num,apt_num,1,gender])
-
-            conn.commit()
-            cur.execute('select * from zawodnicy where pesel=%s::numeric',[pesel])
-            if (cur.rowcount>0):
-                response=f"Dodano zawodnika {name} {surname}"
+            cur.execute('select * from kluby where nazwa_klubu=%s::varchar',[club])
+            if (cur.rowcount==0):
+                response="Zawodnik nie może tworzyć nowego klubu"
             else:
-                response="Niepowodzenie"
+                cur.execute('call dodaj_zawodnika(%s::varchar,%s::varchar,%s::numeric,%s::varchar,%s::varchar,%s::varchar,%s,%s,%s::varchar,%s::char(1))',[name,surname,pesel,street,post_code,town,house_num,apt_num,club,gender])
+
+                conn.commit()
+                cur.execute('select * from zawodnicy where pesel=%s::numeric',[pesel])
+                if (cur.rowcount>0):
+                    response=f"Dodano zawodnika {name} {surname}"
+                else:
+                    response="Niepowodzenie"
         cur.close()
         
-    return render_template('add_zawodnik_form.html',form=form,response=response)
-@app.route('/add_trener',methods=['GET','POST'])
-def add_trener():
+    return render_template('zawodnicy.html',form=form,response=response, value=z)
+
+@app.route('/trenerzy',methods=['GET','POST'])
+def trenerzy():
+    cur=conn.cursor()
+    cur.execute("Select tr.imie, tr.nazwisko, kl.nazwa_klubu from public.trenerzy tr inner join public.kluby kl on tr.id_klubu=kl.id_klubu order by tr.nazwisko asc, tr.imie asc")
+    z=cur.fetchall()
+    cur.close()
     form=AddTrener()
     response=""
     if form.validate_on_submit():
@@ -203,13 +263,14 @@ def add_trener():
             apt_num=None
         pesel=(form.pesel).data
         post_code=(form.post_code).data
+        club=(form.club).data
         
         cur=conn.cursor()
         cur.execute('select * from trenerzy where pesel=%s::numeric',[pesel])
         if ((cur.rowcount>0)):
             response="Trener o podanym peselu już istnieje"
         else:
-            cur.execute('call dodaj_trenera(%s::varchar,%s::varchar,%s::numeric,%s::varchar,%s::varchar,%s::varchar,%s,%s,%s)',[name,surname,pesel,street,post_code,town,house_num,apt_num,1])
+            cur.execute('call dodaj_trenera(%s::varchar,%s::varchar,%s::numeric,%s::varchar,%s::varchar,%s::varchar,%s,%s,%s::varchar)',[name,surname,pesel,street,post_code,town,house_num,apt_num,club])
             conn.commit()
             cur.execute('select * from trenerzy where pesel=%s::numeric',[pesel])
             if (cur.rowcount>0):
@@ -218,41 +279,38 @@ def add_trener():
                 response="Niepowodzenie"
         cur.close()
         
-    return render_template('add_zawodnik_form.html',form=form,response=response)
+    return render_template('trenerzy.html',form=form,response=response, value=z)
 
 
 @app.route('/add_zawody',methods=['GET','POST'])
 def add_zawody():
+    cur=conn.cursor()
+    cur.execute("Select zw.data_zawodow, zw.nazwa, ob.nazwa from public.zawody zw inner join public.obiekty ob on zw.id_obiektu=ob.id_obiektu order by zw.data_zawodow desc")
+    z=cur.fetchall()
+    cur.close()
+
     form=AddZawody()
-    
     
     if form.validate_on_submit():
         zawody=(form.name).data
         
-        type_of_event=(form.type_of_event).data
         location=(form.choose_location).data
         date=(form.date).data
         choices=(form.mul).data
         result=[]
         cur=conn.cursor()
-        if (type_of_event!='tr'):
-            cur.execute('insert into zawody(nazwa,data_zawodow,id_obiektu) values(%s,%s,%s) ',[zawody,date,location])
-            for data in choices:
-                cur.execute('insert into zawody_konkurencje(id_zawodow,id_konkurencji) values((select id_zawodow from zawody where data_zawodow=%s and id_obiektu=%s),%s)',[date,location,data])
-        else:
-            cur.execute('insert into treningi(data_treningu,id_obiektu) values(%s,%s) ',[date,location])
-            for data in choices:
-                cur.execute('insert into treningi_konkurencje(id_zawodow,id_konkurencji) values((select id_treningu from treningi where data_treningu=%s and id_obiektu=%s),%s)',[date,location,data])
+        cur.execute('insert into zawody(nazwa,data_zawodow,id_obiektu) values(%s,%s,%s) ',[zawody,date,location])
+
+        for data in choices:
+            cur.execute('insert into zawody_konkurencje(id_zawodow,id_konkurencji) values((select id_zawodow from zawody where data_zawodow=%s and id_obiektu=%s and nazwa=%s),%s)',[date,location,zawody, data])
             
         conn.commit()
         cur.close()
         
-            
+    return render_template('zawody.html',form=form, value=z)
 
-        
-    return render_template('add_zawodnik_form.html',form=form)
-@app.route('/show_wyniki',methods=['GET','POST'])
-def show_wyniki_zawodnika():
+@app.route('/wyniki_zawodnika',methods=['GET','POST'])
+def wyniki_zawodnika():
     form=ChooseSwimmer()
     val=["",""]
     
@@ -264,21 +322,24 @@ def show_wyniki_zawodnika():
         val=cur.fetchall()
         cur.close()
         
-    return render_template('wyniki.html',form=form,value=val)
+    return render_template('wyniki_zawodnik.html',form=form,value=val)
 
-@app.route('/show_wyniki_zawodow',methods=['GET','POST'])
-def show_wyniki_zawodow():
+@app.route('/wyniki_zawodow',methods=['GET','POST'])
+def wyniki_zawodow():
     form=ChooseZawody()
     val=["",""]
     if form.validate_on_submit():
-        zawody=(form.player).data
+        zawody=(form.zawody).data
+        konkurencja=(form.konkurencja).data
+        plec=(form.plec).data
         cur=conn.cursor()
-        cur.execute(  " select * from wyniki_zawody where id_zawodow =%s;",[zawody])
+        print(konkurencja, plec, zawody)
+        cur.execute(  " select * from wyniki_zawody where id_zawodow =%s AND plec = %s AND id_konkurencji =%s;",[zawody, plec, konkurencja])
         val=cur.fetchall()
         cur.close()
-    return render_template('wyniki.html',form=form,value=val)
-@app.route('/add_wynik',methods=["POST","GET"])
+    return render_template('wyniki_zawody.html',form=form,value=val)
 
+@app.route('/add_wynik',methods=["POST","GET"])
 def add_wynik():
     
     form=DodajWynik()
@@ -297,6 +358,7 @@ def add_wynik():
         
 
     return render_template("add_zawodnik_form1.html",form=form)
+
 @app.route('/add_wynik2',methods=["POST","GET"])
 def add_wynik2():
     form1=Wynik2()
@@ -309,10 +371,13 @@ def add_wynik2():
                 conn.commit()
                 cursor.close()
     return render_template("add_zawodnik_form1.html",form=form1)
-@app.route('/show_grupy',methods=["POST","GET"])
-def show_grupy():
+
+@app.route('/grupy',methods=["POST","GET"])
+def grupy():
     form =ChooseGroup()
     if form.validate_on_submit:
         None
-nav.init_app(app)
-app.run()
+
+if __name__=='__main__':
+    nav.init_app(app)
+    app.run()
