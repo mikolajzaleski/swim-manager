@@ -24,7 +24,9 @@ navb.View('Wyniki','wyniki'),
 navb.View('Dodaj Zawody','add_zawody'),
 navb.View('Zobacz wyniki zawodnika','show_wyniki_zawodnika'),
 navb.View('Zobacz wyniki wg zawodow',"show_wyniki_zawodow"),
-navb.View("Dodaj Wynik","add_wynik")
+navb.View("Dodaj Wynik","add_wynik"),
+navb.View("Usun Zawodnika","delete_z"),
+navb.View("Zmień adres","change_address")
 )
 nav=Nav()
 nav.register_element('top',bar)
@@ -99,6 +101,16 @@ class AddTrener(FlaskForm):
     post_code=StringField('Kod Pocztowy')
     submit=SubmitField('Dodaj Zawodnika')
 
+class ChangeAddress(FlaskForm):
+    player=SelectField("")
+    town=StringField('Miejscowość')
+    street=StringField('Ulica')
+    house_num=IntegerField('Numer budynku')
+    apt_num=IntegerField('Numer lokalu',validators=[validators.optional()])
+    post_code=StringField('Kod Pocztowy')
+    submit=SubmitField("Zatwierdź")
+
+    
 class ChooseGroup(FlaskForm):
     cursor=conn.cursor()
     cursor.execute("SELECT id_grupy,nazwa FROM GRUPY")
@@ -338,5 +350,22 @@ def delete_z():
         conn.commit()
         cursor.close()
     return render_template('add_zawodnik_form.html',form=form,response=response)
+@app.route('/change_add',methods=["POST","GET"])
+def change_address():
+    form=ChangeAddress()
+    cursor=conn.cursor()
+    cursor.execute("SELECT id_zawodnika, imie||' '||nazwisko from zawodnicy ")
+    chc=cursor.fetchall()
+    form.player.choices=chc
+    cursor.close()
+    if form.validate_on_submit():
+        cursor=conn.cursor()
+        cursor.execute("call zmien_adres(%s,%s::varchar,%s::varchar,%s::varchar,%s,%s)",[form.player.data,form.street.data,form.post_code.data,form.town.data,form.house_num.data,form.apt_num.data])
+        conn.commit()
+        cursor.execute("Select from")
+        cursor.close()
+         
+    return render_template('add_zawodnik_form1.html',form=form)
+    
 nav.init_app(app)
 app.run()
