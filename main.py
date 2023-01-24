@@ -38,7 +38,9 @@ app.config.update(dict(
 class MultiCheckboxField(SelectMultipleField):
     widget = widgets.ListWidget(html_tag='ul', prefix_label=False)
     option_widget = widgets.CheckboxInput()
-
+class DeleteForm(FlaskForm):
+    name=SelectField()
+    submit=SubmitField("Zatwierdź")
 
 class AddZawodnik(FlaskForm):
     name=StringField('Imię')
@@ -300,8 +302,12 @@ def add_wynik():
 @app.route('/add_wynik2',methods=["POST","GET"])
 def add_wynik2():
     form1=Wynik2()
+    curso=conn.cursor()
     form1.konkurencja.choices=session['choic']
-    
+    curso.execute("Select z.id_zawodnika, z.imie||' '||z.nazwisko from zawodnicy z")
+    zawodnicy=curso.fetchall()
+    curso.close()
+    form1.zawodnik.choices=zawodnicy
     if form1.validate and form1.submit1.data:
                 cursor=conn.cursor()
                 id=session['id']
@@ -314,5 +320,23 @@ def show_grupy():
     form =ChooseGroup()
     if form.validate_on_submit:
         None
+@app.route('/delete_zawodnik',methods=["POST","GET"])
+def delete_z():
+    form=DeleteForm()
+    response=""
+    cursor=conn.cursor()
+    cursor.execute("SELECT id_zawodnika, imie||' '||nazwisko from zawodnicy ")
+    ch=cursor.fetchall()
+    (form.name).choices=ch
+    cursor.close()
+    if form.validate_on_submit():
+        cursor=conn.cursor()
+        cursor.execute("select imie||' '||nazwisko from zawodnicy where id_zawodnika=%s",[form.name.data])
+        nam=cursor.fetchone()
+        cursor.execute("delete from zawodnicy where id_zawodnika=%s ",[form.name.data])
+        response=f"Usunieto zawodnika  {nam[0] } o id{form.name.data}"
+        conn.commit()
+        cursor.close()
+    return render_template('add_zawodnik_form.html',form=form,response=response)
 nav.init_app(app)
 app.run()
